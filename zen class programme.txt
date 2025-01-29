@@ -1,0 +1,231 @@
+use Zen_class
+switched to db Zen_class
+
+
+1.Users collection
+db.users.insertMany([
+  { _id: 1, name: "Alice", email: "alice@example.com", role: "student" },
+  { _id: 2, name: "Bob", email: "bob@example.com", role: "student" },
+  { _id: 3, name: "Charlie", email: "charlie@example.com", role: "mentor" }
+]);
+
+2.codekata collection
+db.codekata.insertMany([
+  { user_id: 1, problems_solved: 50 },
+  { user_id: 2, problems_solved: 30 }
+]);
+
+3.Attendance Collection
+
+db.attendance.insertMany([
+  { user_id: 1, date: ISODate("2020-10-16"), status: "present" },
+  { user_id: 2, date: ISODate("2020-10-16"), status: "absent" }
+]);
+
+4.Topics Collection
+
+db.topics.insertMany([
+  { _id: 1, topic_name: "MongoDB Basics", date: ISODate("2020-10-10") },
+  { _id: 2, topic_name: "Node.js", date: ISODate("2020-10-20") }
+]);
+
+
+5.Tasks Collection
+
+db.tasks.insertMany([
+  { topic_id: 1, user_id: 1, submission_status: "submitted", date_assigned: ISODate("2020-10-10") },
+  { topic_id: 2, user_id: 2, submission_status: "not submitted", date_assigned: ISODate("2020-10-20") }
+]);
+
+6.Company Drives Collection
+
+db.company_drives.insertMany([
+  { _id: 1, company_name: "Google", drive_date: ISODate("2020-10-18") },
+  { _id: 2, company_name: "Amazon", drive_date: ISODate("2020-10-25") }
+]);
+
+7.Mentors Collection
+db.mentors.insertMany([
+  { _id: 1, mentor_name: "Charlie", mentees: [1, 2] }
+]);
+
+8.Placement Application Collection
+
+db.placement_applications.insertMany([
+  { user_id: 1, drive_id: 1 },
+  { user_id: 2, drive_id: 2 }
+]);
+
+
+
+
+
+1. Find all topics and tasks that were taught in October
+zen_class> db.topics.aggregate([
+...   {
+...     $lookup: {
+...       from: "tasks",
+...       localField: "_id",
+...       foreignField: "topic_id",
+...       as: "tasks"
+...     }
+...   },
+...   {
+...     $match: {
+...       date: { $gte: ISODate("2020-10-01"), $lte: ISODate("2020-10-31") }
+...     }
+...   }
+... ]);
+[
+  {
+    _id: 1,
+    topic_name: 'MongoDB Basics',
+    date: ISODate('2020-10-10T00:00:00.000Z'),
+    tasks: [
+      {
+        _id: ObjectId('679a360f6778065cb5cb0ce6'),
+        topic_id: 1,
+        user_id: 1,
+        submission_status: 'submitted',
+        date_assigned: ISODate('2020-10-10T00:00:00.000Z')
+      }
+    ]
+  },
+  {
+    _id: 2,
+    topic_name: 'Node.js',
+    date: ISODate('2020-10-20T00:00:00.000Z'),
+    tasks: [
+      {
+        _id: ObjectId('679a360f6778065cb5cb0ce7'),
+        topic_id: 2,
+        user_id: 2,
+        submission_status: 'not submitted',
+        date_assigned: ISODate('2020-10-20T00:00:00.000Z')
+      }
+    ]
+  }
+]
+
+
+
+2. Find all company drives between 15-Oct-2020 and 31-Oct-2020
+zen_class> db.company_drives.find({
+...   drive_date: { $gte: ISODate("2020-10-15"), $lte: ISODate("2020-10-31") }
+... });
+[
+  {
+    _id: 1,
+    company_name: 'Google',
+    drive_date: ISODate('2020-10-18T00:00:00.000Z')
+  },
+  {
+    _id: 2,
+    company_name: 'Amazon',
+    drive_date: ISODate('2020-10-25T00:00:00.000Z')
+  }
+]
+
+3. Find all company drives and students who appeared for placements
+
+ db.placement_applications.aggregate([
+...   {
+...     $lookup: {
+...       from: "company_drives",
+...       localField: "drive_id",
+...       foreignField: "_id",
+...       as: "drive_details"
+...     }
+...   },
+...   {
+...     $lookup: {
+...       from: "users",
+...       localField: "user_id",
+...       foreignField: "_id",
+...       as: "student_details"
+...     }
+...   }
+... ]);
+[
+  {
+    _id: ObjectId('679a362c6778065cb5cb0ce8'),
+    user_id: 1,
+    drive_id: 1,
+    drive_details: [
+      {
+        _id: 1,
+        company_name: 'Google',
+        drive_date: ISODate('2020-10-18T00:00:00.000Z')
+      }
+    ],
+    student_details: [
+      {
+        _id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        role: 'student'
+      }
+    ]
+  },
+  {
+    _id: ObjectId('679a362c6778065cb5cb0ce9'),
+    user_id: 2,
+    drive_id: 2,
+    drive_details: [
+      {
+        _id: 2,
+        company_name: 'Amazon',
+        drive_date: ISODate('2020-10-25T00:00:00.000Z')
+      }
+    ],
+    student_details: [
+      {
+        _id: 2,
+        name: 'Bob',
+        email: 'bob@example.com',
+        role: 'student'
+      }
+    ]
+  }
+]
+
+
+4. Find the number of problems solved by each user in Codekata
+
+zen_class> db.codekata.find({}, { user_id: 1, problems_solved: 1, _id: 0 });
+[
+  { user_id: 1, problems_solved: 50 },
+  { user_id: 2, problems_solved: 30 }
+]
+
+5. Find mentors with more than 15 mentees
+
+zen_class> db.mentors.find({ $where: "this.mentees.length > 15" });
+
+6. Find the number of users who were absent and did not submit tasks between 15-Oct-2020 and 31-Oct-2020
+
+db.attendance.aggregate([
+...   {
+...     $match: {
+...       date: { $gte: ISODate("2020-10-15"), $lte: ISODate("2020-10-31") },
+...       status: "absent"
+...     }
+...   },
+...   {
+...     $lookup: {
+...       from: "tasks",
+...       localField: "user_id",
+...       foreignField: "user_id",
+...       as: "task_details"
+...     }
+...   },
+...   {
+...     $match: {
+...       "task_details.submission_status": "not submitted"
+...     }
+...   },
+...   {
+...     $count: "absent_and_not_submitted"
+...   }
+... ]);
+[ { absent_and_not_submitted: 1 } ]
